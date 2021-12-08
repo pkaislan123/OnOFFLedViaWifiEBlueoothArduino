@@ -1,0 +1,113 @@
+
+#include <SoftwareSerial.h>
+#include <ESP8266WiFi.h>
+
+SoftwareSerial btSerial(D2, D3);
+
+
+// Credenciais de acesso à rede
+const char* ssid     = "aislan";
+const char* password = "12345678";
+
+// Setting Static IP.
+//IPAddress local_IP(192, 168, 100, 170);
+//IPAddress gateway(192, 168, 100, 1);
+//IPAddress subnet(255, 255, 255, 0);
+//IPAddress primaryDNS(8, 8, 8, 8); //opcional
+//IPAddress secondaryDNS(8, 8, 4, 4); //opcional
+// Número da porta (80) do servidor web
+WiFiServer server(80);
+
+void setup() {
+  Serial.begin(9600);
+
+  btSerial.begin(38400);
+
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  //if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+   // Serial.println("Error in configuration.");
+ // }
+    // Conectar à rede WiFi
+    Serial.print("A ligar a: ");
+    Serial.println(ssid);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+    }
+
+    Serial.println("");
+    Serial.println("Ligado");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+    server.begin();
+  }
+
+
+  void loop() {
+
+
+    if (btSerial.available() > 0) {    // verifique se o módulo bluetooth envia alguns dados para esp8266
+
+      char data = btSerial.read();     // leia os dados do HC-05
+      Serial.println(data);
+      switch (data)
+      {
+        case 'L':
+          digitalWrite(LED_BUILTIN, LOW);
+          break;
+        case 'D':
+          digitalWrite(LED_BUILTIN, HIGH);
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (Serial.available())
+    {
+      delay(10); // The DELAY! ********** VERY IMPORTANT *******
+      btSerial.write(Serial.read());
+    }
+
+    WiFiClient client = server.available();
+    if (!client) {
+      return;
+    }
+
+    Serial.println("Novo Cliente.");
+    while (!client.available()) {
+      delay(1);
+    }
+
+    // Lê a primeira linha do pedido
+    String req = client.readStringUntil('\r');
+    Serial.println(req);
+    client.flush();
+
+    int val;
+
+    if (req.indexOf("/ledone/1") != -1) {
+      digitalWrite(LED_BUILTIN, LOW);
+      val = 1;
+    } else if (req.indexOf("/ledone/0") != -1) {
+      digitalWrite(LED_BUILTIN, HIGH);
+      val = 0;
+    }
+
+    client.flush();
+
+    // Prepare a resposta
+    String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\nLED  ";
+    s += (val) ? "Ligado" : "Desligado";
+
+    // Envie a resposta para o cliente
+    client.print(s);
+    delay(1);
+    Serial.println("Cliente desligado.");
+
+
+
+
+  }
